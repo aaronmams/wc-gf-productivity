@@ -188,3 +188,124 @@ lb <- lb %>% left_join(home.ports,by=c('DRVID','RYEAR'))
 ###############################################################################
 ###############################################################################
 ###############################################################################
+#Get some diversity indicators
+
+#-----------------------------------------------------------------------------
+# Groundfish Revenue relative to total annual vessel revenue
+channel <- odbcConnect(dsn="pacfin",uid=paste(uid),pw=paste(pw),believeNRows=FALSE)
+revshares <- sqlQuery(channel,"select VESSEL_NUM, LANDING_YEAR, FLEET_CODE, MANAGEMENT_GROUP_CODE, sum(EXVESSEL_REVENUE) as rev
+                      from PACFIN_MARTS.COMPREHENSIVE_FT
+                      group by VESSEL_NUM, LANDING_YEAR, FLEET_CODE, MANAGEMENT_GROUP_CODE")
+close(channel)
+#-----------------------------------------------------------------------------
+
+
+#----------------------------------------------------------------------------
+# revenue shares of key groundfish species relative to groundfish revenue
+channel <- odbcConnect(dsn="pacfin",uid=paste(uid),pw=paste(pw),believeNRows=FALSE)
+gf.revshares <- sqlQuery(channel,"select VESSEL_NUM, LANDING_YEAR, FLEET_CODE, PACFIN_SPECIES_CODE, sum(EXVESSEL_REVENUE) as rev
+                      from PACFIN_MARTS.COMPREHENSIVE_FT
+                        where MANAGEMENT_GROUP_CODE = 'GRND'
+                         group by VESSEL_NUM, LANDING_YEAR, FLEET_CODE, PACFIN_SPECIES_CODE")
+close(channel)
+#----------------------------------------------------------------------------
+
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+#use lat/long of tow sets to approximate distance traveled for each trip
+
+
+#lat/long coordinates for each port and the key to match
+# port identifiers between observer data and PacFIN data
+port_codes <- read.csv("data/lbk_port_codes.csv")
+
+
+#set-up port coordinates - we set this up by departure and
+# return port because we will need lat/long for both in order
+# to approximate the trip distance
+
+dport_codes <- data.frame(d_port=port_codes$OBS_port,dport_lat=port_codes$LAT,dport_long=port_codes$LONG)
+dport_codes <- dport_codes[!duplicated(dport_codes),]
+dport_codes <- dport_codes[which(dport_codes$d_port!=""),]
+
+rport_codes <- data.frame(r_port=port_codes$OBS_port,rport_lat=port_codes$LAT,rport_long=port_codes$LONG,rPCID=port_codes$PCID)
+rport_codes <- rport_codes[!duplicated(rport_codes),]
+rport_codes <- rport_codes[which(rport_codes$r_port!=""),]
+
+
+#pull the tow level data from logbooks
+channel <- odbcConnect(dsn="pacfin",uid=paste(uid),pw=paste(pw),believeNRows=FALSE)
+tows <- sqlQuery(channel,"select TRIP_ID, TOWNUM, SET_LAT, SET_LONG, UP_LAT, UP_LONG, DEPTH1 from PACFIN.LBK_TOW")
+close(channel)
+
+lb_ports <- lb %>% select(TRIP_ID, AGID, DPORT, RPORT) 
+
+tows <- tbl_df(tows) %>% left_join(lb_ports, by=c("TRIP_ID"))
+
+#-------------------------------------------------------------------------------------------------------------
+#before joining the port codes data frame with the tows data frame we have to fix the Astoria code because it's
+# '02' which often gets read as 2:
+port_codes$LBK_PORT <- as.character(port_codes$LBK_PORT)
+port_codes$LBK_PORT[which(port_codes$AGID=='O' & port_codes$PCID=='AST')] <- '02'
+
+#also, Washington uses 'AST' for trips departing from Astoria but returning to WA ports
+
+
+#------------------------------------------------------------------------------------------------------------
+
+
+d_port_codes <- port_codes[,c("LBK_PORT","AGID","LAT","LONG")]
+names(d_port_codes) <- c("DPORT","AGID","LAT","LONG")
+  
+tows <- tows %>% left_join(d_port_codes,by=c('DPORT','AGID'))
+names(tows) <- c('TRIP_ID','TOWNUM','SET_LAT','SET_LONG','UP_LAT','UP_LONG','DEPTH1','AGID','DPORT','RPORT','DPORT_LAT','DPORT_LONG')
+
+r_port_codes <- port_codes[,c("LBK_PORT","AGID","LAT","LONG")]
+names(d_port_codes) <- c("RPORT","AGID","LAT","LONG")
+
+tows <- tows %>% left_join(d_port_codes,by=c('RPORT','AGID'))
+
+
+#use the spatial midpoint of tows 
+#midpoints <- df.tmp %>% mutate(x=cos(lat*(pi/180))*cos(long*(pi/180)),
+#                               y=cos(lat*(pi/180))*sin(long*(pi/180)),
+#                               z=sin(lat*(pi/180))) %>% #convert lat/long to radians then cartesian coordinates
+#  group_by(trip_id) %>%
+#  summarise(mean.x=mean(x),mean.y=mean(y),mean.z=mean(z)) %>%  #get average coordinates
+#  mutate(long.center=atan2(mean.y,mean.x),
+#         hyp=sqrt((mean.x*mean.x)+(mean.y*mean.y)),
+#         lat.center=atan2(mean.z,hyp)) %>% #convert back to lat/long radians
+#  mutate(lon.c=long.center*(180/pi),
+#         lat.c=lat.center*(180/pi)) %>% #convert back to decimal degrees
+#  select(trip_id,lat.c,lon.c)
+
+
+#get port lat and longs
+#tows <- wcop.df %>% left_join(dport_codes,by="d_port")
+#tows <- wcop.df %>% left_join(rport_codes,by="r_port")
+
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+
+
+
