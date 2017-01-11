@@ -258,9 +258,6 @@ tows <- tbl_df(tows) %>% left_join(lb_ports, by=c("TRIP_ID"))
 port_codes$LBK_PORT <- as.character(port_codes$LBK_PORT)
 port_codes$LBK_PORT[which(port_codes$AGID=='O' & port_codes$PCID=='AST')] <- '02'
 
-#also, Washington uses 'AST' for trips departing from Astoria but returning to WA ports
-
-
 #------------------------------------------------------------------------------------------------------------
 
 
