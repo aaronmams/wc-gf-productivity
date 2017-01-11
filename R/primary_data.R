@@ -250,7 +250,7 @@ close(channel)
 
 lb_ports <- lb %>% select(TRIP_ID, AGID, DPORT, RPORT) 
 
-tows <- tbl_df(tows) %>% left_join(lb_ports, by=c("TRIP_ID"))
+tows <- tbl_df(tows) %>% left_join(lb_ports, by=c("TRIP_ID")) %>% mutate(SET_LONG=SET_LONG*-1)
 
 #-------------------------------------------------------------------------------------------------------------
 #before joining the port codes data frame with the tows data frame we have to fix the Astoria code because it's
@@ -271,9 +271,10 @@ r_port_codes <- port_codes[,c("LBK_PORT","AGID","LAT","LONG")]
 names(d_port_codes) <- c("RPORT","AGID","LAT","LONG")
 
 tows <- tows %>% left_join(d_port_codes,by=c('RPORT','AGID'))
-
-
-#use the spatial midpoint of tows 
+names(tows) <- c('TRIP_ID','TOWNUM','SET_LAT','SET_LONG','UP_LAT','UP_LONG','DEPTH1','AGID','DPORT','RPORT',
+                 'DPORT_LAT','DPORT_LONG','RPORT_LAT','RPORT_LONG')
+#-----------------------------------------------------------------------------
+#calculate the spatial midpoint of tows 
 #midpoints <- df.tmp %>% mutate(x=cos(lat*(pi/180))*cos(long*(pi/180)),
 #                               y=cos(lat*(pi/180))*sin(long*(pi/180)),
 #                               z=sin(lat*(pi/180))) %>% #convert lat/long to radians then cartesian coordinates
@@ -290,6 +291,69 @@ tows <- tows %>% left_join(d_port_codes,by=c('RPORT','AGID'))
 #get port lat and longs
 #tows <- wcop.df %>% left_join(dport_codes,by="d_port")
 #tows <- wcop.df %>% left_join(rport_codes,by="r_port")
+#-------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+#calculate distance per trip by connecting tow sets
+
+#first a diagnostic...number of trips with no good tow locations and number of 
+# trips with number of good tow set locations = number of tows
+tows.tmp <- tows %>% group_by(TRIP_ID) %>% mutate(bad_pos=ifelse(is.na(SET_LAT),1,0),good_pos=1-bad_pos) %>%
+      summarise(townum=max(TOWNUM),good_pos=sum(good_pos),bad_pos=sum(bad_pos))
+
+tows.tmp %>% mutate(all.good=ifelse(good_pos==townum,1,0)) %>% ungroup() %>% summarise(all.good=sum(all.good))
+
+length(tows.tmp$good_pos[tows.tmp$good_pos==0])
+
+dtemp.fn <- function(x,y){
+  p1 <- (x*pi)/180
+  p2 <- (y*pi)/180
+  a <- sin((p2[1]-p1[1])*0.5)*sin((p2[1]-p1[1])*0.5) + sin((p2[2]-p1[2])*0.5)*sin((p2[2]-p1[2])*0.5)*cos(p1[1])*cos(p2[1])
+  c <- 2*atan2(sqrt(a),sqrt(1-a))
+  d <- c*6371
+  return(d)
+}
+
+#filter the data set to include only good tow set locations
+tow.locs <- tows %>% filter(!is.na(SET_LAT)) %>% filter(!is.na(SET_LONG)) %>% filter(!is.na(DPORT_LAT)) %>%
+      filter(!is.na(RPORT_LAT)) %>% filter(!is.na(DPORT_LONG)) %>% filter(!is.na(RPORT_LONG)) %>%
+      filter(SET_LAT > 20 & SET_LONG < 20) %>% 
+      arrange(TRIP_ID,TOWNUM) 
+
+#get the distance from departure port to first tow set
+dstart <- tow.locs %>% arrange(TRIP_ID,TOWNUM) %>% group_by(TRIP_ID) %>% filter(row_number()==1) %>%
+    mutate(dstart=dtemp.fn(x=c(DPORT_LONG,DPORT_LAT),y=c(SET_LONG,SET_LAT)))
+
+quantile(dstart$dstart,probs=c(0.001,0.25,0.5,0.75,0.99))
+
+# get distance from last tow to return port
+dend <- tow.locs %>% arrange(TRIP_ID,TOWNUM) %>% group_by(TRIP_ID) %>% filter(row_number()==n()) %>%
+  mutate(dend=dtemp.fn(x=c(RPORT_LONG,RPORT_LAT),y=c(SET_LONG,SET_LAT)))
+
+# get distance between all tow sets on the trip...in order to do this one we need the trip to have
+# at least two good tow set positions...for some reason this doesn't like my user defined function so
+# we'll just hardcode the haversine distance
+tow.dist <- tow.locs %>% select(TRIP_ID, TOWNUM, SET_LAT, SET_LONG, AGID, DPORT, RPORT) %>%
+            group_by(TRIP_ID) %>% 
+            arrange(TRIP_ID, TOWNUM) %>%
+            mutate(ntows=n_distinct(TOWNUM),
+                   lat.now=(SET_LAT*pi)/180, 
+                   long.now=(SET_LONG*pi)/180,
+                   lag.long=(lag(SET_LONG)*pi)/180,
+                   lag.lat=(lag(SET_LAT)*pi/180)) %>%
+            mutate(a=sin((long.now-lag.long)*0.5)*sin((long.now-lag.long)*0.5) + sin((lat.now-lag.lat)*0.5)*sin((lat.now-lag.lat)*0.5)*cos(lag.long)*cos(long.now),
+                   c= 2*atan2(sqrt(a),sqrt(1-a)),
+                   d=c*6371) %>%
+            summarise(d=sum(d,na.rm=T))
+
+#put the distances together
+d <- dstart %>% select(TRIP_ID,dstart) %>% 
+      inner_join(dend,by=c('TRIP_ID')) 
+d <- d %>% 
+    inner_join(tow.dist,by=c('TRIP_ID')) %>%
+    mutate(trip.dist=dstart+dend+d)
+
+#------------------------------------------------------------------------------
 
 ###############################################################################
 ###############################################################################
