@@ -355,6 +355,10 @@ d <- d %>%
 
 #------------------------------------------------------------------------------
 
+#add trip distances to logbooks
+trip.dist <- d %>% select(TRIP_ID,trip.dist)  
+lb <- lb %>% left_join(trip.dist,by=c('TRIP_ID'))
+
 ###############################################################################
 ###############################################################################
 ###############################################################################
@@ -368,5 +372,33 @@ d <- d %>%
 ###############################################################################
 ###############################################################################
 
+
+#get lbs and value
+t <- Sys.time()
+channel <- odbcConnect(dsn="pacfin",uid=paste(uid),pw=paste(pw),believeNRows=FALSE)
+catch <- sqlQuery(channel,"select VESSEL_NUM, FTID, PACFIN_SPECIES_CODE, sum(LANDED_WEIGHT_LBS) as totalweight, sum(EXVESSEL_REVENUE) as totalvalue 
+                 from PACFIN_MARTS.COMPREHENSIVE_FT
+                 group by VESSEL_NUM, FTID, PACFIN_SPECIES_CODE")
+close(channel)
+Sys.time() - t
+
+#keep every fish ticket in the logbook data
+catch <- tbl_df(catch) %>% filter(FTID %in% unique(lb$FTID))
+
+saveRDS(catch,"data/catch_by_ftid.RDA")
+
+#################################################################################
+#################################################################################
+#################################################################################
+#################################################################################
+#################################################################################
+#################################################################################
+#################################################################################
+
+
+#Final step is to clean up lb data frame and save it
+lb <- lb %>% 
+
+saveRDS(lb,"data/lb_trip.RDA")
 
 
