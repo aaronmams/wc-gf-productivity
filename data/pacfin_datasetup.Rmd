@@ -32,7 +32,7 @@ This table includes summary information for each groundfish trawl trip.  Importa
 
 B. COMPREHENSIVE_FT
 
-This is the main table in PacFIN where commercial fish landings are stored.  The COMPREHENSIVE_FT table includes massive amounts of  information on fish landed on the U.S. West Coast.  The present task draws on three key pieces of information: fish tickets, fleet codes, and an IFQ flag. Each landing of each fish species is recorded on a fish ticket which indicates, among other things, the pounds of each species landed and price paid for each species by the dealer.  In the COMPREHENSIVE_FT table, each fish ticket is assigned to a fleet code.  Fleet codes for the groundfish fishery include ('XX' for tribal landings, 'OA' for open access landings, and 'LE' for limited entry landings, and 'R' for research landings). Each landing in the COMPREHENSIVE_FT table is also assigned a T/F flag for whether the landing is associated with the IFQ fishery.
+This is the main table in PacFIN where commercial fish landings are stored.  The COMPREHENSIVE_FT table includes massive amounts of  information on fish landed on the U.S. West Coast.  The present task draws on three key pieces of information: fish tickets, fleet codes, and an IFQ flag. Each landing of each fish species is recorded on a fish ticket which indicates, among other things, the pounds of each species landed and price paid for each species by the dealer.  In the COMPREHENSIVE_FT table, each fish ticket is assigned to a fleet code.  Fleet codes for the groundfish fishery include ('TI' for tribal landings, 'OA' for open access landings, and 'LE' for limited entry landings, 'R' for research landings, and 'XX' for NA). Each landing in the COMPREHENSIVE_FT table is also assigned a T/F flag for whether the landing is associated with the IFQ fishery.
 
 In this step we utilize the following fields from the COMPREHENSIVE_FT table:
 
@@ -57,4 +57,81 @@ to another buyer this would result in two different fish tickets for the same tr
 
 2. Next, the logbook trip data with fish ticket identifiers integrated is joined with the fleet codes and IFQ flags from the COMPREHENSIVE_FT
 table using the common fields vessel identifier and FTID.
+
+## Step 2
+
+Next, we join vessel characteristics (length, weight, horsepower) with the logbook trip information.  Vessel characteristics are available in the SWFSC_FISH_TICKETS table in the PACFIN_MARTS schema of the PACFIN database.  
+
+A notable issue here is that not all vessel characteristics come from the same source.  Large vessels are registered by the U.S. Coastguard. Some smaller vessels participating in the groundfish fishery do not appear in the Coastguards's vessel characteristics table in the PACFIN database.  Characteristics of these smaller vessels are taken from state vessel registries.  
+For this reason, there are two fields in the COMPREHENSIVE_FT table corresponding to vessel length: 
+
+* CG_VESSEL_LENGTH is Coastguard length
+* VESSEL_LENGTH is length taken from state registries if Coastguard length was unavailable
+
+We use Coastguard length when it is available and only supplement with vessel length from the state registry when Coastguard is unavaiable.
+
+Vessel length, weight, and horsepower, are added to the logbook trip data frame by joining matching on vessel identifier and year.
+
+## Step 3
+
+Next we assign each vessel in the logbook data to a home port and home region based on the where the vessel made the majority of its landings each year.
+
+Landings by port for each vessel and year are obtained from the COMPREHENSIVT_FT table.  Rather than use volume of landings as the measure of landings by port, we use a count of unique fish ticket identifiers to define the home port.  The home region is defined as the INPFC Region containing the vessel's home port. 
+
+## Step 4
+
+Next we calculate two revenue diversity measures for each vessel and each year.  The diverification measures are:
+
+1. Total revenue from each species management group (groundfish, coastal pelagic, highly migratory species, crab, samon, shrimp, shellfish, and other). 
+2. Total revenue of each landed groundfish species relative to total groundfish revenue.
+
+Here it should be noted that aggregates for both diversification measures are taken with respect to fleet codes.  For example, some vessels land open access groundfish and limited entry or IFQ groundfish in the same year.  In cases like these, the vessel/year combination will have an entry for total limited entry groundfish revenue and total open access groundfish revenue.
+
+
+## Step 5
+
+Step 5 calculates the total distance traveled on each logbook trip and relies data from the following:
+
+1. lbk_port_codes.csv - this is a MS Excel File containing the latitude and longitude of all ports on the West Coast where groundfish is landed.
+
+2. LBK_TOW - this a data table available in the PACFIN schema of the PACFIN database.  This table contains latitude and longitude coordinates of each tow set on each trip in the logbook data.  The table also contains information on the average depth of each tow, which we retain.
+
+Here it is important to note that port codes used in the LBK_TRIP table differ from the main port codes used in PACFIN's COMPREHENSIVE_FT and SWFSC_FISH_TICKET tables.  Our data file 'lbk_port_codes.csv' has a column labeled LBK_PORT and column labeled 'AGID'.  Using these two columns it is possible to join the port locations ('lbk_port_codes.csv') with the tow-level data (LBK_TOW).
+
+The distance (km) traveled on each trip is obtained by calculating the distance (using the Haversine distance formula) from the departure port to the first tow set, the distance between each successive pair of tow sets (first and second, second and third, third and forth, and so on), then the distance from the last tow set to the return port.
+
+Here it is worth noting that only the locations of tow sets are used to approximate the total distance.  This is because, while the data on tow set locations is reasonably complete, most of the trips in our sample include at least one tow for which the tow retrieval location was not entered.  
+
+## Step 6
+
+The final step aggregates the pounds and value of all species landed on each fish ticket.  This information will be used in later set up files to aggregate the total outputs for each vessel on each fishing trip, year, or other temporal unit.  This pounds and value aggregation uses a very simple query against the COMPREHENSIVE_FT table in the PACFIN database.  The code below is provided as an illustration.  Because of the size of the COMPREHENSIVE_FT table we recommend leaving the actual code commented out.
+
+```{r}
+#t <- Sys.time()
+#channel <- odbcConnect(dsn="pacfin",uid=paste(uid),pw=paste(pw),believeNRows=FALSE)
+#catch <- sqlQuery(channel,"select VESSEL_NUM, FTID, PACFIN_SPECIES_CODE, sum(LANDED_WEIGHT_LBS) as totalweight, sum(EXVESSEL_REVENUE) as totalvalue 
+#                 from PACFIN_MARTS.COMPREHENSIVE_FT
+#                 group by VESSEL_NUM, FTID, PACFIN_SPECIES_CODE")
+#close(channel)
+#Sys.time() - t
+
+#keep every fish ticket in the logbook data
+#catch <- tbl_df(catch) %>% filter(FTID %in% unique(lb$FTID))
+
+```
+
+In this primary data set up we choose to aggregate the pounds and value of outputs only to the species level for each fish ticket because we want the end user to have the flexibility of choosing different ways to aggregate the many species of groundfish.
+
+For example, in productivity studies of multiproduct firms with many different outputs it is sometimes desireable to form output aggregates.  Output aggregates that have been used in the West Coast Groundfish Fishery include:
+
+* DTS and non-DTS - this aggregate creates two outputs where the first group is combined landings of Dover sole, shortspine thornyheads, longspine thornyheads, and sablefish and the second group contains all other landings.
+* A five group aggregate: flatfish, roundfish, rockfish, sharks and skates, and other.
+
+Using our approach a user only needs to run the primary data set up once.  After the primary data set up has been run the user can run a productivity analysis using different output aggregates quickly and easily.  
+
+
+
+
+
+
 

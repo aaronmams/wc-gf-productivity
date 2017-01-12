@@ -41,7 +41,7 @@ lb <- sqlQuery(channel,"select TRIP_ID, AGID, VIDTYPE, DRVID, NCREW, NGAL, DYEAR
 vc <- sqlQuery(channel,"select VESSEL_NUM, PACFIN_YEAR, max(CG_VESSEL_LENGTH), max(VESSEL_LENGTH), max(VESSEL_WEIGHT)
 FROM PACFIN_MARTS.SWFSC_FISH_TICKETS
                GROUP BY VESSEL_NUM, PACFIN_YEAR" )
-trips.ports <- sqlQuery(channel,paste("select VESSEL_NUM, LANDING_YEAR, PACFIN_PORT_CODE, count(FTID)",
+trips.ports <- sqlQuery(channel,paste("select VESSEL_NUM, LANDING_YEAR, PACFIN_PORT_CODE, count(distinct FTID)",
                                 "from PACFIN_MARTS.COMPREHENSIVE_FT",
                                 "where MANAGEMENT_GROUP_CODE='GRND'",
                                 "group by VESSEL_NUM, LANDING_YEAR, PACFIN_PORT_CODE"))
