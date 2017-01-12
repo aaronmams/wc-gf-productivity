@@ -1,0 +1,60 @@
+---
+title: "data_setup"
+author: "aaron mamula"
+date: "January 12, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The file primary_data.R pulls data for PacFIN and sets it up for use in productivity/technical efficiency analysis.
+
+The following steps and operations are carried out:
+
+
+## Step 1
+
+Fish ticket identifiers and fleet codes are joined with trip level logbook data.
+
+This operation involves data from three tables:
+
+A. LBK_TRIP
+
+This table includes summary information for each groundfish trawl trip.  Important information contained in this table include:
+
+* Departure and return date of each trip
+* Departure port and return port for each trip
+* Number of crew and gallons of fuel used on each trip
+* A vessel identifier and identifier for each trip
+
+
+B. COMPREHENSIVE_FT
+
+This is the main table in PacFIN where commercial fish landings are stored.  The COMPREHENSIVE_FT table includes massive amounts of  information on fish landed on the U.S. West Coast.  The present task draws on three key pieces of information: fish tickets, fleet codes, and an IFQ flag. Each landing of each fish species is recorded on a fish ticket which indicates, among other things, the pounds of each species landed and price paid for each species by the dealer.  In the COMPREHENSIVE_FT table, each fish ticket is assigned to a fleet code.  Fleet codes for the groundfish fishery include ('XX' for tribal landings, 'OA' for open access landings, and 'LE' for limited entry landings, and 'R' for research landings). Each landing in the COMPREHENSIVE_FT table is also assigned a T/F flag for whether the landing is associated with the IFQ fishery.
+
+In this step we utilize the following fields from the COMPREHENSIVE_FT table:
+
+* FTID = fish ticket identifiers  
+* FLEET_CODE = fleet codes  
+* IS_IFQ_LANDING = the T/F code for IFQ landings
+
+C. LBK_FTID
+
+This table matches the fish ticket identifiers from the COMPREHENSIVE_FT table to trip identifiers from the LBK_TRIP table. 
+
+After pulling the necessary fields from the tables in the PacFIN database we perform the following joins:
+
+1. logbook trip data from the LBK_TRIP table is joined with fish ticket identifier from the LBK_FTID table using the common field
+'TRIP_ID'
+
+Note that this involves a one-to-many join because the same trip identifier from the trawl logbooks can be (and often is) associated with multiple
+fish ticket identifiers.  This can happen for any number of reasons, the following scenario provides just one example: Suppose a vessel takes a 
+two day trip and catches 100 pounds of petrale sole and 100 pounds of sablefish. If the vessels sells the petrale sole to one buyer and the sablefish
+to another buyer this would result in two different fish tickets for the same trip. 
+
+
+2. Next, the logbook trip data with fish ticket identifiers integrated is joined with the fleet codes and IFQ flags from the COMPREHENSIVE_FT
+table using the common fields vessel identifier and FTID.
+

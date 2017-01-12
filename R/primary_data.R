@@ -28,11 +28,16 @@ library(lubridate)
 #                "on PACFIN.LBK_TRIP.TRIP_ID=PACFIN.LBK_TOW.TRIP_ID"))
 #close(channel)
 
+t <- Sys.time()
 #Date Pulls:
 channel <- odbcConnect(dsn="pacfin",uid=paste(uid),pw=paste(pw),believeNRows=FALSE)
 lb_ftid <- sqlQuery(channel,"select * from PACFIN.LBK_FTID")
-fleets <- sqlQuery(channel,"select VESSEL_NUM, LANDING_DATE,FTID, FLEET_CODE, IS_IFQ_LANDING from PACFIN_MARTS.COMPREHENSIVE_FT WHERE MANAGEMENT_GROUP_CODE = 'GRND'")
-lb <- sqlQuery(channel,"select * from PACFIN.LBK_TRIP")
+
+fleets <- sqlQuery(channel,"select DISTINCT VESSEL_NUM, LANDING_DATE, FTID, FLEET_CODE, IS_IFQ_LANDING from PACFIN_MARTS.COMPREHENSIVE_FT WHERE MANAGEMENT_GROUP_CODE = 'GRND'")
+
+lb <- sqlQuery(channel,"select TRIP_ID, AGID, VIDTYPE, DRVID, NCREW, NGAL, DYEAR, DMONTH, DDAY, DTIME,
+               DPORT, RYEAR, RMONTH, RDAY, RTIME, RPORT, NTOWS from PACFIN.LBK_TRIP")
+
 vc <- sqlQuery(channel,"select VESSEL_NUM, PACFIN_YEAR, max(CG_VESSEL_LENGTH), max(VESSEL_LENGTH), max(VESSEL_WEIGHT)
 FROM PACFIN_MARTS.SWFSC_FISH_TICKETS
                GROUP BY VESSEL_NUM, PACFIN_YEAR" )
@@ -41,6 +46,7 @@ trips.ports <- sqlQuery(channel,paste("select VESSEL_NUM, LANDING_YEAR, PACFIN_P
                                 "where MANAGEMENT_GROUP_CODE='GRND'",
                                 "group by VESSEL_NUM, LANDING_YEAR, PACFIN_PORT_CODE"))
 close(channel)
+Sys.time() - t
 
 lb <- tbl_df(lb) %>% mutate(depart=as.Date(DDAY), return=as.Date(RDAY),DAS=as.numeric(return-depart)+1)
 
@@ -167,7 +173,7 @@ port.region <- data.frame(
 )
 names(port.region) <- c('REGION','PACFIN_PORT_CODE')
 home.ports <- home.ports %>% left_join(port.region,by=c('PACFIN_PORT_CODE'))
-
+names(home.ports) <- c('DRVID','RYEAR','HOMEPORT','ntix','HOMEREGION')
 
 trips.ports <- trips.ports %>% filter(DRVID %in% unique(lb$DRVID))
 
@@ -396,9 +402,13 @@ saveRDS(catch,"data/catch_by_ftid.RDA")
 #################################################################################
 
 
-#Final step is to clean up lb data frame and save it
-lb <- lb %>% 
+#Final step is to save the lb file
+
 
 saveRDS(lb,"data/lb_trip.RDA")
 
+
+#also save the revenue shares and groundfish species revenue shares for each vessel/year
+saveRDS(revshares,"data/fishery_rev_shares.RDA")
+saveRDS(gf.revshares,"data/gf_rev_shares.RDA")
 
