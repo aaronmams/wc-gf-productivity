@@ -388,6 +388,14 @@ catch <- sqlQuery(channel,"select VESSEL_NUM, FTID, PACFIN_SPECIES_CODE, sum(LAN
 close(channel)
 Sys.time() - t
 
+
+#gotta fix a bunch of nominal codes....it's easiest I think just to create a spreadsheet then
+# do a read-in and merge
+nominal.codes <- read.csv('data/nominal_codes.csv')
+catch <- catch %>% mutate(NOMCODE=as.character(PACFIN_SPECIES_CODE))
+  left_join(nominal.codes,by=c('NOMCODE'))
+
+
 #keep every fish ticket in the logbook data
 catch <- tbl_df(catch) %>% filter(FTID %in% unique(lb$FTID))
 
