@@ -1,4 +1,4 @@
-
+t <- Sys.time()
 library(RODBC)
 library(dplyr)
 library(lubridate)
@@ -382,9 +382,9 @@ lb <- lb %>% left_join(trip.dist,by=c('TRIP_ID'))
 #get lbs and value
 t <- Sys.time()
 channel <- odbcConnect(dsn="pacfin",uid=paste(uid),pw=paste(pw),believeNRows=FALSE)
-catch <- sqlQuery(channel,"select VESSEL_NUM, FTID, PACFIN_SPECIES_CODE, sum(LANDED_WEIGHT_LBS) as totalweight, sum(EXVESSEL_REVENUE) as totalvalue 
+catch <- sqlQuery(channel,"select VESSEL_NUM, LANDING_YEAR, FTID, PACFIN_SPECIES_CODE, sum(LANDED_WEIGHT_LBS) as totalweight, sum(EXVESSEL_REVENUE) as totalvalue 
                  from PACFIN_MARTS.COMPREHENSIVE_FT
-                 group by VESSEL_NUM, FTID, PACFIN_SPECIES_CODE")
+                 group by VESSEL_NUM, LANDING_YEAR, FTID, PACFIN_SPECIES_CODE")
 close(channel)
 Sys.time() - t
 
@@ -392,9 +392,12 @@ Sys.time() - t
 #gotta fix a bunch of nominal codes....it's easiest I think just to create a spreadsheet then
 # do a read-in and merge
 nominal.codes <- read.csv('data/nominal_codes.csv')
-catch <- catch %>% mutate(NOMCODE=as.character(PACFIN_SPECIES_CODE))
-  left_join(nominal.codes,by=c('NOMCODE'))
+catch <- catch %>% mutate(NOMCODE=as.character(PACFIN_SPECIES_CODE)) %>%
+  left_join(nominal.codes,by=c('NOMCODE')) %>% 
+  mutate(SPS=ifelse(is.na(PACFIN_SPECIES_CODE.y),as.character(PACFIN_SPECIES_CODE.x),as.character(PACFIN_SPECIES_CODE.y))) %>%
+  select(VESSEL_NUM, FTID, TOTALWEIGHT, TOTALVALUE, SPS, LANDING_YEAR)
 
+names(catch) <- c('VESSEL_NUM', 'FTID', 'TOTALWEIGHT', 'TOTALVALUE', 'PACFIN_SPECIES_CODE')
 
 #keep every fish ticket in the logbook data
 catch <- tbl_df(catch) %>% filter(FTID %in% unique(lb$FTID))
@@ -420,3 +423,4 @@ saveRDS(lb,"data/lb_trip.RDA")
 saveRDS(revshares,"data/fishery_rev_shares.RDA")
 saveRDS(gf.revshares,"data/gf_rev_shares.RDA")
 
+Sys.time() - t

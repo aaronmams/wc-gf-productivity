@@ -59,7 +59,7 @@ catchshare.groups <- data.frame(
                       "VRML","YLTL","USHR","USLF","RCK1","RCK2","RCK3","RCK4","RCK7","RCK8","RCK9"),GROUP="SHRF"),
     data.frame(SPID=c("ARRA","BANK","BLGL","DBRK","RCK5","RCK6","REYE","RDBD","USLP","SLRF"),GROUP="SLRF"),
     data.frame(SPID=c("UDAB","PDAB","SDAB","BSOL","CSOL",
-                      "FSOL","SSOL","REX","RSOL"),GROUP="OFLT"),
+                      "FSOL","SSOL","REX","RSOL",'FNTS','BMOL','DSOL'),GROUP="OFLT"),
     data.frame(SPID="PCOD",GROUP="PCOD"),
     data.frame(SPID="PHAL",GROUP="PHAL"),
     data.frame(SPID="POP",GROUP="POP"),
@@ -73,7 +73,9 @@ catchshare.groups <- data.frame(
     data.frame(SPID="YTRK",GROUP="YTRK"),
     data.frame(SPID="PWHT",GROUP="PWHT"),
     data.frame(SPID=c("BLCK","BLUR","BRWN","CLCO","COPP","OLVE","QLBK","TREE","BYEL","CBZN","CHNA","GPHR","GRAS"),
-               GROUP=rep('NSRF',13))
+               GROUP='NSRF'),
+    data.frame(SPID=c('CHLB','WBAS'),GROUP=c('CHLB_WBAS','CHLB_WBAS')),
+    data.frame(SPID=c('PHLB'),GROUP='PHLB')
   )
 )
 
