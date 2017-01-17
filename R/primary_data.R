@@ -397,7 +397,7 @@ catch <- catch %>% mutate(NOMCODE=as.character(PACFIN_SPECIES_CODE)) %>%
   mutate(SPS=ifelse(is.na(PACFIN_SPECIES_CODE.y),as.character(PACFIN_SPECIES_CODE.x),as.character(PACFIN_SPECIES_CODE.y))) %>%
   select(VESSEL_NUM, FTID, TOTALWEIGHT, TOTALVALUE, SPS, LANDING_YEAR)
 
-names(catch) <- c('VESSEL_NUM', 'FTID', 'TOTALWEIGHT', 'TOTALVALUE', 'PACFIN_SPECIES_CODE')
+names(catch) <- c('VESSEL_NUM', 'FTID', 'TOTALWEIGHT', 'TOTALVALUE', 'PACFIN_SPECIES_CODE', 'YEAR')
 
 #keep every fish ticket in the logbook data
 catch <- tbl_df(catch) %>% filter(FTID %in% unique(lb$FTID))
